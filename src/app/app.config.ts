@@ -10,10 +10,10 @@ function getNonce(){
 }
 export const appConfig: ApplicationConfig = {
   providers: [
-    {
-      provide:CSP_NONCE,
-      useValue:getNonce()
-    },
+    // {
+    //   provide:CSP_NONCE,
+    //   useValue:getNonce()
+    // },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideAnimationsAsync(),
