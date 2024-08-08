@@ -1,0 +1,36 @@
+// date-format.directive.ts
+import { Directive, ElementRef, HostListener } from '@angular/core';
+
+@Directive({
+    selector: '[appDateFormat]'
+})
+export class DateFormatDirective {
+
+    constructor(private el: ElementRef) { }
+
+    @HostListener('input', ['$event']) onInputChange(event: any) {
+        const initialValue = this.el.nativeElement.value;
+
+        // Remove all non-digit characters
+        const sanitizedValue = initialValue.replace(/[^0-9]/g, '');
+
+        // Format the value with slashes
+        const formattedValue = this.formatDate(sanitizedValue);
+
+        // Set the formatted value to the input field
+        this.el.nativeElement.value = formattedValue;
+    }
+
+    private formatDate(value: string): string {
+        if (value.length > 2) {
+            value = value.slice(0, 2) + '/' + value.slice(2);
+        }
+        if (value.length > 5) {
+            value = value.slice(0, 5) + '/' + value.slice(5);
+        }
+        if (value.length > 10) {
+            value = value.slice(0, 10);
+        }
+        return value;
+    }
+}
