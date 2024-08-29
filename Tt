@@ -1,36 +1,37 @@
-// date-format.directive.ts
-import { Directive, ElementRef, HostListener } from '@angular/core';
+const fs = require('fs');
+const path = require('path');
 
-@Directive({
-    selector: '[appDateFormat]'
-})
-export class DateFormatDirective {
+// Directory containing your files
+const directoryPath = './your-directory-path'; // Change to your directory
 
-    constructor(private el: ElementRef) { }
+// Output file where the export statements will be saved
+const outputFilePath = './exports.js'; // Change to desired output file
 
-    @HostListener('input', ['$event']) onInputChange(event: any) {
-        const initialValue = this.el.nativeElement.value;
+// Function to capitalize part of a string
+const capitalizePart = (filename) => {
+  const nameWithoutExtension = path.basename(filename, path.extname(filename));
+  return nameWithoutExtension.toUpperCase();
+};
 
-        // Remove all non-digit characters
-        const sanitizedValue = initialValue.replace(/[^0-9]/g, '');
+// Read all files from the directory
+fs.readdir(directoryPath, (err, files) => {
+  if (err) {
+    return console.log('Unable to scan directory: ' + err);
+  }
 
-        // Format the value with slashes
-        const formattedValue = this.formatDate(sanitizedValue);
+  const exportStatements = files
+    .filter((file) => path.extname(file) === '.js' || path.extname(file) === '.ts')
+    .map((file) => {
+      const fileNamePart = capitalizePart(file);
+      return `export * as ${fileNamePart} from './${file}';`;
+    })
+    .join('\n');
 
-        // Set the formatted value to the input field
-        this.el.nativeElement.value = formattedValue;
+  // Write the export statements to the output file
+  fs.writeFile(outputFilePath, exportStatements, (err) => {
+    if (err) {
+      return console.log('Error writing to file: ' + err);
     }
-
-    private formatDate(value: string): string {
-        if (value.length > 2) {
-            value = value.slice(0, 2) + '/' + value.slice(2);
-        }
-        if (value.length > 5) {
-            value = value.slice(0, 5) + '/' + value.slice(5);
-        }
-        if (value.length > 10) {
-            value = value.slice(0, 10);
-        }
-        return value;
-    }
-}
+    console.log('Export statements generated successfully!');
+  });
+});
