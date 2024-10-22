@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Updated regex to handle nested parentheses correctly
+// Regex for addValidators and imports
 const regex = /addValidators\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
-const importRegex = /^import.*;$/gm; // Regex to match import lines
-const exportRegex = /^(export\s+(function|class|const|let|var|interface)\s+)/gm; // Regex to match export declarations
+const importRegex = /^import.*;$/gm; // Matches all import statements
+const exportRegex = /^(export\s+(function|class|const|let|var|interface)\s+)/gm; // Matches export declarations
 
 function extractAndDeclareVariables(content) {
   const matches = content.matchAll(regex);
@@ -30,18 +30,20 @@ function extractAndDeclareVariables(content) {
   // Prepare the variable declarations
   const variableDeclarations = variables.map(({ name, args }) => `const ${name} = ${args};`).join('\n');
   
-  // Find the position of the last import statement
-  const lastImportIndex = [...newContent.matchAll(importRegex)].pop()?.index || 0;
+  // Find the last import line
+  const lastImportMatch = [...newContent.matchAll(importRegex)].pop();
+  const lastImportIndex = lastImportMatch ? lastImportMatch.index + lastImportMatch[0].length : 0;
   
-  // Find the position of the first export statement
-  const firstExportMatch = [...newContent.matchAll(exportRegex)].shift();
-  const exportIndex = firstExportMatch ? firstExportMatch.index : lastImportIndex;
+  // Find the first export statement
+  const firstExportMatch = newContent.match(exportRegex);
+  const exportIndex = firstExportMatch ? firstExportMatch.index : newContent.length;
 
-  // Insert the variable declarations after the import statements and before the export function/class
-  const beforeExport = newContent.slice(0, exportIndex);
-  const afterExport = newContent.slice(exportIndex);
+  // Insert the variable declarations after the import statements and before the export statement
+  const beforeExports = newContent.slice(0, exportIndex);
+  const afterExports = newContent.slice(exportIndex);
 
-  newContent = beforeExport + '\n' + variableDeclarations + '\n' + afterExport;
+  // Construct new content
+  newContent = beforeExports.slice(0, lastImportIndex) + '\n' + beforeExports.slice(lastImportIndex) + '\n' + variableDeclarations + '\n' + afterExports;
   
   return newContent;
 }
