@@ -3,6 +3,7 @@ const path = require('path');
 
 // Updated regex to handle nested parentheses correctly
 const regex = /addValidators\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
+const importRegex = /^import.*;$/gm; // Regex to match import lines
 
 function extractAndDeclareVariables(content) {
   const matches = content.matchAll(regex);
@@ -25,9 +26,16 @@ function extractAndDeclareVariables(content) {
     });
   }
 
-  // Prepend the variable declarations to the new content
+  // Prepare the variable declarations
   const variableDeclarations = variables.map(({ name, args }) => `const ${name} = ${args};`).join('\n');
-  return variableDeclarations + '\n' + newContent;
+  
+  // Find the last import line
+  const lastImportIndex = [...newContent.matchAll(importRegex)].pop()?.index || 0;
+
+  // Insert the variable declarations right after the import statements
+  newContent = newContent.slice(0, lastImportIndex) + '\n' + newContent.slice(lastImportIndex) + '\n' + variableDeclarations + '\n';
+  
+  return newContent;
 }
 
 function processFiles(directory, outputDirectory) {
