@@ -1,97 +1,69 @@
 const fs = require('fs');
 const path = require('path');
 
-// Function to generate a unique variable name for validators
-function generateVariableName(functionName, index) {
-    return `var${functionName}${index}`;
-}
+// Updated regex to handle nested parentheses correctly
+const regex = /addValidators\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
 
-// Function to process a file
-function processFile(filePath, outputDirectory) {
-    fs.readFile(filePath, 'utf8', function (err, data) {
-        if (err) {
-            return console.log(`Error reading file: ${filePath}`, err);
-        }
+function extractAndDeclareVariables(content) {
+  const matches = content.matchAll(regex);
 
-        console.log(`Processing file: ${filePath}`);
+  const variables = [];
+  let newContent = content;
 
-        // Regex to match both standalone and looped addValidators calls
-        const addValidatorRegex = /(\w+\.get\('.*?'\))\?\.\s*addValidators\((\w+)\((.*?)\s*,\s*"(.*?)"\)\);/g;
-        let match;
-        let replacements = data;
-        let counter = 0;
+  for (const match of matches) {
+    const validatorArgs = match[1]; // Extract the entire argument passed into addValidators
 
-        // Array to hold the new variable declarations
-        let newDeclarations = '';
+    const variableName = `varAddValidator${variables.length}`; // Unique variable name for each call
+    const variableDeclaration = `const ${variableName} = ${validatorArgs};`;
 
-        // Find each `addValidators(func(arg, "message"))` call
-        while ((match = addValidatorRegex.exec(data)) !== null) {
-            const control = match[1];        // The control (e.g., service.get("cptCode"))
-            const functionName = match[2];   // The function name (e.g., CPTCodeRejectP1946)
-            const functionArgs = match[3];   // The first argument (e.g., batch.gatewayPayerId.toUpperCase())
-            const errorMessage = match[4];   // The error message (e.g., "*CPT code cannot be SQE01 for AMR sites when Payer Id is P1946")
+    // Replace the entire addValidators call with the variable reference
+    newContent = newContent.replace(match[0], `addValidators(${variableName})`);
 
-            // Generate a unique variable name
-            const variableName = generateVariableName(functionName, counter);
-
-            // Create the new variable declaration
-            const variableDeclaration = `const ${variableName} = ${functionName}(${functionArgs}, "${errorMessage}");\n`;
-
-            // Append the new declaration to the top
-            newDeclarations += variableDeclaration;
-
-            // Replace the original call with the variable
-            const originalCall = `${control}?.addValidators(${functionName}(${functionArgs}, "${errorMessage}"));`;
-            const replacementCall = `${control}?.addValidators(${variableName});`;
-            replacements = replacements.replace(originalCall, replacementCall);
-
-            counter++;
-        }
-
-        // Prepend the new declarations at the top of the file
-        replacements = newDeclarations + replacements;
-
-        // Create the new file in the output directory
-        const outputFilePath = path.join(outputDirectory, path.basename(filePath));
-        console.log(`Writing file to: ${outputFilePath}`);
-
-        fs.writeFile(outputFilePath, replacements, 'utf8', function (err) {
-            if (err) return console.log(`Error writing file: ${outputFilePath}`, err);
-            console.log(`Processed file successfully: ${outputFilePath}`);
-        });
+    variables.push({
+      name: variableName,
+      args: validatorArgs,
     });
+  }
+
+  // Prepend the variable declarations to the new content
+  const variableDeclarations = variables.map(({ name, args }) => `const ${name} = ${args};`).join('\n');
+  return variableDeclarations + '\n' + newContent;
 }
 
-// Function to process all TypeScript files in a directory and save them to a new directory
-function processDirectory(directoryPath, outputDirectory) {
-    fs.readdir(directoryPath, function (err, files) {
+function processFiles(directory, outputDirectory) {
+  fs.readdir(directory, (err, files) => {
+    if (err) {
+      console.error(`Error reading directory: ${err}`);
+      return;
+    }
+
+    // Create output directory if it doesn't exist
+    if (!fs.existsSync(outputDirectory)) {
+      fs.mkdirSync(outputDirectory, { recursive: true });
+    }
+
+    files.forEach(file => {
+      const filePath = path.join(directory, file);
+      fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
-            return console.log('Unable to scan directory: ' + err);
+          console.error(`Error reading file ${file}: ${err}`);
+          return;
         }
 
-        // Create the output directory if it doesn't exist
-        if (!fs.existsSync(outputDirectory)) {
-            fs.mkdirSync(outputDirectory);
-        }
-
-        // Iterate through each file in the directory
-        files.forEach(function (file) {
-            const filePath = path.join(directoryPath, file);
-
-            // Check if it's a TypeScript file (.ts)
-            if (filePath.endsWith('.ts')) {
-                processFile(filePath, outputDirectory);
-            } else {
-                console.log(`Skipping non-TypeScript file: ${file}`);
-            }
+        const newContent = extractAndDeclareVariables(data);
+        const newFilePath = path.join(outputDirectory, file); // Preserve the same file name in the output directory
+        fs.writeFile(newFilePath, newContent, 'utf8', err => {
+          if (err) {
+            console.error(`Error writing file ${newFilePath}: ${err}`);
+          } else {
+            console.log(`Processed file ${newFilePath}`);
+          }
         });
+      });
     });
+  });
 }
 
-// Path to the directory where your Angular project files are located
-const directoryPath = '/path/to/your/angular/project';
-// Path to the directory where the modified files will be saved
-const outputDirectory = '/path/to/output/directory';
-
-// Start processing the directory
-processDirectory(directoryPath, outputDirectory);
+const directoryPath = './'; // Replace with your input directory path
+const outputDirectoryPath = './output'; // Replace with your output directory path
+processFiles(directoryPath, outputDirectoryPath);
