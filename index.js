@@ -4,6 +4,7 @@ const path = require('path');
 // Updated regex to handle nested parentheses correctly
 const regex = /addValidators\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
 const importRegex = /^import.*;$/gm; // Regex to match import lines
+const exportRegex = /^(export\s+(function|class|const|let|var|interface)\s+)/gm; // Regex to match export declarations
 
 function extractAndDeclareVariables(content) {
   const matches = content.matchAll(regex);
@@ -29,11 +30,18 @@ function extractAndDeclareVariables(content) {
   // Prepare the variable declarations
   const variableDeclarations = variables.map(({ name, args }) => `const ${name} = ${args};`).join('\n');
   
-  // Find the last import line
+  // Find the position of the last import statement
   const lastImportIndex = [...newContent.matchAll(importRegex)].pop()?.index || 0;
+  
+  // Find the position of the first export statement
+  const firstExportMatch = [...newContent.matchAll(exportRegex)].shift();
+  const exportIndex = firstExportMatch ? firstExportMatch.index : lastImportIndex;
 
-  // Insert the variable declarations right after the import statements
-  newContent = newContent.slice(0, lastImportIndex) + '\n' + newContent.slice(lastImportIndex) + '\n' + variableDeclarations + '\n';
+  // Insert the variable declarations after the import statements and before the export function/class
+  const beforeExport = newContent.slice(0, exportIndex);
+  const afterExport = newContent.slice(exportIndex);
+
+  newContent = beforeExport + '\n' + variableDeclarations + '\n' + afterExport;
   
   return newContent;
 }
